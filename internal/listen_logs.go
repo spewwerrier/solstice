@@ -1,0 +1,5 @@
+package solstice
+
+func ListenLogs() {
+
+}
