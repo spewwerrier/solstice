@@ -5,7 +5,8 @@ Both ipv4 and ipv6 ip are supported and can be edited in runtime without restart
 any services.
 
 Running Solstice
-go generate && go build && sudo ./solstice
+go generate ./... && go build -o solstice cmd/main.go && sudo ./solstice;
+
 
 Future plans for this project are
 - runtime editable interfaces (currently ip are hardcoded but updated on runtime)
