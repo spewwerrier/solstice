@@ -9,9 +9,11 @@ import (
 
 func main() {
 	serv := solstice.Server{}
+	conn := solstice.InitSqlite()
 	xdp := solstice.InitXDP()
 
 	var wg sync.WaitGroup
+
 	solstice.FilterMaps(xdp.Objs)
 
 	wg.Add(4)
@@ -27,18 +29,12 @@ func main() {
 	}()
 
 	go func() {
-		// for v := range ipaddr {
-		// fmt.Println(utils.ParseIpAddr(v))
-		// }
-	}()
-
-	go func() {
 		for v := range solstice.BlockedIpaddrChan {
 			fmt.Println(utils.ParseIpAddr(v))
 		}
 	}()
 
-	serv.Start()
+	serv.Start(conn, xdp.Objs)
 
 	wg.Wait()
 }

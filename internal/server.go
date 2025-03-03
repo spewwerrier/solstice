@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"spewwerrier/solstice/utils"
+	"strconv"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -14,7 +15,9 @@ var BlockedIpaddrChan = make(chan []byte, 10)
 var LogsIpaddrChan = make(chan []byte, 10)
 
 type Server struct {
-	mux *http.ServeMux
+	mux  *http.ServeMux
+	db   *Sequel
+	objs *packetObjects
 }
 
 func (s *Server) setEndpoints() {
@@ -24,10 +27,14 @@ func (s *Server) setEndpoints() {
 	s.mux.HandleFunc("/logs", logsHandler)
 	s.mux.HandleFunc("/logsip", sseHandlerLogs)
 
+	s.mux.HandleFunc("/savefilter", s.saveFilter)
 }
 
-func (s *Server) Start() {
+func (s *Server) Start(sqlite *Sequel, objs *packetObjects) {
 	s.mux = http.NewServeMux()
+	s.db = sqlite
+	s.objs = objs
+
 	s.setEndpoints()
 
 	serv := &http.Server{
@@ -127,4 +134,34 @@ func logsHandler(w http.ResponseWriter, r *http.Request) {
 	`
 	w.Header().Set("Content-Type", "text/html")
 	w.Write([]byte(html))
+}
+
+func (s *Server) saveFilter(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	ipv4 := r.Form.Get("ipv4")
+	if len(ipv4) > 0 {
+		u32_ipv4, _ := strconv.ParseUint(ipv4, 10, 32)
+		AppendIpv4(s.objs, uint32(u32_ipv4))
+		s.db.DbAppendIpv4(uint32(u32_ipv4))
+		w.Write([]byte("saved in db"))
+		return
+	}
+
+	high := r.Form.Get("high")
+	if len(high) > 0 {
+		low := r.Form.Get("low")
+		u64_high, _ := strconv.ParseUint(high, 10, 64)
+		u64_low, _ := strconv.ParseUint(low, 10, 64)
+
+		ipv6 := packetIpv6Addr{
+			High: u64_high,
+			Low:  u64_low,
+		}
+
+		AppendIpv6(s.objs, ipv6)
+		s.db.DbAppendIpv6(ipv6)
+		w.Write([]byte("saved in db"))
+		return
+	}
+
 }
