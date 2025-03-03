@@ -3,7 +3,6 @@ package solstice
 import (
 	"log"
 	"net"
-	solstice "spewwerrier/solstice/utils"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
@@ -11,8 +10,11 @@ import (
 	"github.com/cilium/ebpf/rlimit"
 )
 
-// ipdata is a channel that recevies data and puts the value in sequelite
-func ListenBlocked() {
+type Block struct {
+	Objs *packetObjects
+}
+
+func InitBlockXDP() *Block {
 
 	if err := rlimit.RemoveMemlock(); err != nil {
 		log.Fatal("Removing memlock: ", err)
@@ -28,7 +30,7 @@ func ListenBlocked() {
 		log.Fatal("Failed getting interface: ", err)
 	}
 
-	link, err := link.AttachXDP(
+	_, err = link.AttachXDP(
 		link.XDPOptions{
 			Program:   objs.PacketFilter,
 			Interface: iface.Index,
@@ -37,10 +39,18 @@ func ListenBlocked() {
 	if err != nil {
 		log.Fatal("Failed attaching xdp: ", err)
 	}
-	defer link.Close()
+	// defer link.Close()
+	block := &Block{
+		Objs: &objs,
+	}
+	return block
+
+}
+
+func (b *Block) ListenBlocked(ipbytes chan<- []byte) {
 
 	// ipblocked is a ringbuffer that gives the blocked ip address
-	rb, err := ringbuf.NewReader(objs.IpBlocked)
+	rb, err := ringbuf.NewReader(b.Objs.IpBlocked)
 	if err != nil {
 		log.Fatal("opening ringbuffer: ", err)
 	}
@@ -56,7 +66,7 @@ func ListenBlocked() {
 		3769001575,
 	}
 	for _, ips := range ipv4 {
-		err = objs.BlacklistIpv4.Update(ips, true, ebpf.UpdateAny)
+		err = b.Objs.BlacklistIpv4.Update(ips, true, ebpf.UpdateAny)
 		if err != nil {
 			log.Fatal("cannot update blacklist ipv4: ", err)
 		}
@@ -81,20 +91,12 @@ func ListenBlocked() {
 	}
 
 	for _, ips := range ipv6 {
-		err = objs.BlacklistIpv6.Update(ips, true, ebpf.UpdateAny)
+		err = b.Objs.BlacklistIpv6.Update(ips, true, ebpf.UpdateAny)
 		if err != nil {
 			log.Fatal("cannot update blacklist ipv6: ", err)
 		}
 
 	}
-
-	// db, err := sql.Open("sqlite3", "./logs.db")
-	// if err != nil {
-	// 	log.Fatal("Failed opening sqlite: ", err)
-	// }
-	// defer db.Close()
-
-	// stmt := `insert into `
 
 	for {
 		record, err := rb.Read()
@@ -102,32 +104,8 @@ func ListenBlocked() {
 			log.Fatal("Failed reading from reader: ", err)
 		}
 		data := record.RawSample
-		solstice.ParseIpAddr(data)
-		// ipdata <- record.RawSample
-
-		// if len(data) == 4 {
-
-		// data := binary.LittleEndian.Uint32(record.RawSample)
-
-		// log.Printf("Blocking Ipv4\t Ipv4: %d.%d.%d.%d\t RawInt: %d",
-		// 	((data >> 0) & 0xFF),
-		// 	((data >> 8) & 0xFF),
-		// 	((data >> 16) & 0xFF),
-		// 	((data >> 24) & 0xFF),
-		// 	data,
-		// )
-
-		// } else {
-		// var ip = net.IP(data)
-
-		// ipv6Bytes := ip.To16()
-
-		// high := binary.BigEndian.Uint64(ipv6Bytes[:8])
-		// low := binary.BigEndian.Uint64(ipv6Bytes[8:])
-
-		// log.Printf("Blocking IPv6\t Ipv6: %s\t RawInt: %d %d\n", ip, high, low)
-
-		// }
+		ipbytes <- data
+		IpaddrChan <- data
 
 	}
 }

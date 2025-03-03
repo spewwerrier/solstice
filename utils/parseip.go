@@ -1,17 +1,17 @@
-package solstice
+package utils
 
 import (
 	"encoding/binary"
-	"log"
+	"fmt"
 	"net"
 )
 
-func ParseIpAddr(data []byte) {
+func ParseIpAddr(data []byte) string {
 	if len(data) == 8 {
 		data_u32 := binary.LittleEndian.Uint32(data)
 		packetSize := binary.LittleEndian.Uint32(data[4:])
 
-		log.Printf("Blocking Ipv4\t Ipv4: %d.%d.%d.%d\t RawInt: %d\t PacketSize: %d",
+		str := fmt.Sprintf("Blocking Ipv4\t %d.%d.%d.%d\t RawInt: %d\t PacketSize: %d",
 			((data_u32 >> 0) & 0xFF),
 			((data_u32 >> 8) & 0xFF),
 			((data_u32 >> 16) & 0xFF),
@@ -19,6 +19,7 @@ func ParseIpAddr(data []byte) {
 			data_u32,
 			packetSize,
 		)
+		return str
 
 	} else {
 		var ip = net.IP(data[0:16])
@@ -29,7 +30,8 @@ func ParseIpAddr(data []byte) {
 		high := binary.BigEndian.Uint64(ipv6Bytes[:8])
 		low := binary.BigEndian.Uint64(ipv6Bytes[8:])
 
-		log.Printf("Blocking IPv6\t Ipv6: %s\t RawInt: %d %d\t PacketSize: %d\n", ip, high, low, packetSize)
+		str := fmt.Sprintf("Blocking IPv6\t %s\t RawInt: %d %d\t PacketSize: %d\n", ip, high, low, packetSize)
+		return str
 	}
 
 }
