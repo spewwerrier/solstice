@@ -10,15 +10,19 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-var IpaddrChan = make(chan []byte, 10)
+var BlockedIpaddrChan = make(chan []byte, 10)
+var LogsIpaddrChan = make(chan []byte, 10)
 
 type Server struct {
 	mux *http.ServeMux
 }
 
 func (s *Server) setEndpoints() {
-	s.mux.HandleFunc("/blockedip", sseHandlerBlocked)
 	s.mux.HandleFunc("/", indexHandler)
+	s.mux.HandleFunc("/blockedip", sseHandlerBlocked)
+
+	s.mux.HandleFunc("/logs", logsHandler)
+	s.mux.HandleFunc("/logsip", sseHandlerLogs)
 
 }
 
@@ -47,7 +51,25 @@ func sseHandlerBlocked(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for ip := range IpaddrChan {
+	for ip := range BlockedIpaddrChan {
+		fmt.Fprintf(w, "data: %s\n\n", utils.ParseIpAddr(ip))
+		flusher.Flush()
+		time.Sleep(1 * time.Second)
+	}
+}
+
+func sseHandlerLogs(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	for ip := range LogsIpaddrChan {
 		fmt.Fprintf(w, "data: %s\n\n", utils.ParseIpAddr(ip))
 		flusher.Flush()
 		time.Sleep(1 * time.Second)
@@ -67,11 +89,41 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		<script>
 			const eventSource = new EventSource("/blockedip");
 			eventSource.onmessage = function(event) {
-				document.getElementById("log").innerHTML += "<p>" + event.data + "</p>";
+				const logDiv = document.getElementById("log");
+				const newEntry = document.createElement("p");
+				newEntry.textContent = event.data;
+				logDiv.prepend(newEntry);
 			};
 		</script>
 	</body>
 	</html>
+	`
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(html))
+}
+
+func logsHandler(w http.ResponseWriter, r *http.Request) {
+	html := `
+	<!DOCTYPE html>
+	<html>
+	<head>
+		<title>IP Logs</title>
+	</head>
+	<body>
+		<h1>Unblocked IP Logs</h1>
+		<div id="log"></div>
+		<script>
+			const eventSource = new EventSource("/logsip");
+			eventSource.onmessage = function(event) {
+				const logDiv = document.getElementById("log");
+				const newEntry = document.createElement("p");
+				newEntry.textContent = event.data;
+				logDiv.prepend(newEntry);
+			};
+		</script>
+	</body>
+	</html>
+	
 	`
 	w.Header().Set("Content-Type", "text/html")
 	w.Write([]byte(html))

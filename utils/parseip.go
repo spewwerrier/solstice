@@ -11,7 +11,7 @@ func ParseIpAddr(data []byte) string {
 		data_u32 := binary.LittleEndian.Uint32(data)
 		packetSize := binary.LittleEndian.Uint32(data[4:])
 
-		str := fmt.Sprintf("Blocking Ipv4\t %d.%d.%d.%d\t RawInt: %d\t PacketSize: %d",
+		str := fmt.Sprintf("Ipv4\t %d.%d.%d.%d\t RawInt: %d\t PacketSize: %d\n",
 			((data_u32 >> 0) & 0xFF),
 			((data_u32 >> 8) & 0xFF),
 			((data_u32 >> 16) & 0xFF),
@@ -30,7 +30,7 @@ func ParseIpAddr(data []byte) string {
 		high := binary.BigEndian.Uint64(ipv6Bytes[:8])
 		low := binary.BigEndian.Uint64(ipv6Bytes[8:])
 
-		str := fmt.Sprintf("Blocking IPv6\t %s\t RawInt: %d %d\t PacketSize: %d\n", ip, high, low, packetSize)
+		str := fmt.Sprintf("IPv6\t %s\t RawInt: %d %d\t PacketSize: %d\n", ip, high, low, packetSize)
 		return str
 	}
 

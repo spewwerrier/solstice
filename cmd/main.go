@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	solstice "spewwerrier/solstice/internal"
 	"spewwerrier/solstice/utils"
 	"sync"
@@ -8,23 +9,32 @@ import (
 
 func main() {
 	serv := solstice.Server{}
-	block := solstice.InitBlockXDP()
-
-	ipaddr := make(chan []byte, 10)
+	xdp := solstice.InitXDP()
 
 	var wg sync.WaitGroup
+	solstice.FilterMaps(xdp.Objs)
 
-	wg.Add(2)
+	wg.Add(4)
 
 	go func() {
 		defer wg.Done()
-		block.ListenBlocked(ipaddr)
+		xdp.ListenBlocked()
 	}()
 
 	go func() {
 		defer wg.Done()
-		for data := range ipaddr {
-			utils.ParseIpAddr(data)
+		xdp.ListenLogs()
+	}()
+
+	go func() {
+		// for v := range ipaddr {
+		// fmt.Println(utils.ParseIpAddr(v))
+		// }
+	}()
+
+	go func() {
+		for v := range solstice.BlockedIpaddrChan {
+			fmt.Println(utils.ParseIpAddr(v))
 		}
 	}()
 
